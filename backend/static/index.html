@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Software Engineer — Control Center</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; background: #0f1115; color: #e6e6e6; }
+  h1 { font-size: 1.4rem; }
+  .card { background: #1a1d24; border-radius: 10px; padding: 18px; margin: 16px 0; border: 1px solid #2a2e38; }
+  .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #23262e; }
+  .row:last-child { border-bottom: none; }
+  .label { color: #9099a8; }
+  .ok { color: #4ade80; font-weight: 600; }
+  .fail { color: #f87171; font-weight: 600; }
+  .warn { color: #fbbf24; font-weight: 600; }
+  button { background: #3b82f6; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+  button:hover { background: #2563eb; }
+  input { background: #0f1115; border: 1px solid #2a2e38; color: #e6e6e6; padding: 8px; border-radius: 6px; width: 100%; box-sizing: border-box; margin: 6px 0; }
+  .manual { background: #2a2410; border: 1px solid #4a3f10; color: #fbbf24; padding: 12px; border-radius: 8px; }
+</style>
+</head>
+<body>
+  <h1>AI Software Engineer — Control Center</h1>
+
+  <div class="card">
+    <div class="row"><span class="label">Environment</span><span id="env">-</span></div>
+    <div class="row"><span class="label">Model provider</span><span id="provider">-</span></div>
+  </div>
+
+  <div id="session-section"></div>
+
+  <div class="card">
+    <h3 style="margin-top:0">Register a new cloud session</h3>
+    <p style="color:#9099a8; font-size:0.85rem;">Manually start your Kaggle/Colab notebook first, copy the tunnel URL it prints, then paste it here.</p>
+    <input id="tunnel_url" placeholder="https://xxxx.trycloudflare.com">
+    <input id="provider_input" placeholder="colab">
+    <input id="model_input" placeholder="model name (optional)">
+    <input id="gpu_input" placeholder="GPU (optional)">
+    <button onclick="registerSession()">Register session</button>
+  </div>
+
+  <script>
+    async function refresh() {
+      const res = await fetch('/api/status');
+      const data = await res.json();
+      document.getElementById('env').textContent = data.app_env;
+      document.getElementById('provider').textContent = data.model_provider;
+
+      const section = document.getElementById('session-section');
+      if (!data.session) {
+        section.innerHTML = `<div class="manual">
+          <strong>MANUAL_ACTION_REQUIRED</strong><br>
+          No active cloud inference session. Open your prepared Kaggle/Colab notebook and start it, then register the tunnel URL below.
+        </div>`;
+        return;
+      }
+
+      const s = data.session;
+      section.innerHTML = `<div class="card">
+        <div class="row"><span class="label">Provider</span><span>${s.provider}</span></div>
+        <div class="row"><span class="label">Model</span><span>${s.model || '-'}</span></div>
+        <div class="row"><span class="label">GPU</span><span>${s.gpu || '-'}</span></div>
+        <div class="row"><span class="label">Endpoint</span><span>${s.tunnel_url}</span></div>
+        <div class="row"><span class="label">Status</span><span>${s.status}</span></div>
+        <div class="row"><span class="label">Live health</span><span class="${s.healthy ? 'ok' : 'fail'}">${s.healthy ? 'OK' : 'FAIL: ' + s.error}</span></div>
+        <div class="row"><span class="label">Latency</span><span>${s.latency ? s.latency.toFixed(3) + 's' : '-'}</span></div>
+        <div class="row"><span class="label">Expires</span><span>${s.expires_at}</span></div>
+        <button onclick="stopSession('${s.id}')">Stop session</button>
+      </div>`;
+    }
+
+    async function registerSession() {
+      const params = new URLSearchParams({
+        tunnel_url: document.getElementById('tunnel_url').value,
+        provider: document.getElementById('provider_input').value || 'colab',
+        model: document.getElementById('model_input').value,
+        gpu: document.getElementById('gpu_input').value,
+      });
+      await fetch('/api/session/register?' + params, { method: 'POST' });
+      refresh();
+    }
+
+    async function stopSession(id) {
+      await fetch('/api/session/stop?session_id=' + id, { method: 'POST' });
+      refresh();
+    }
+
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>

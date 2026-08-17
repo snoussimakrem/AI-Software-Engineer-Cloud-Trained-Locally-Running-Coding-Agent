@@ -1,8 +1,10 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from backend.core.config import settings
+from backend.api.dashboard import router as dashboard_router
 
 app = FastAPI(title="AI Software Engineer - Control Center")
 
@@ -25,3 +27,7 @@ async def health():
         "model_provider": settings.model_provider,
         "app_env": settings.app_env,
     }
+
+
+app.include_router(dashboard_router)
+app.mount("/", StaticFiles(directory="backend/static", html=True), name="static")
