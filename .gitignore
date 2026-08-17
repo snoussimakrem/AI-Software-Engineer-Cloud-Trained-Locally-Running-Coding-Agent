@@ -1,0 +1,32 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Environment / secrets
+.env
+*.pem
+*.key
+
+# Data & models (large, cloud-hosted, never committed)
+pgdata/
+datasets/raw/
+datasets/processed/
+models/registry/*.bin
+models/registry/*.gguf
+models/registry/*.safetensors
+*.ckpt
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+*.log
+logs/
