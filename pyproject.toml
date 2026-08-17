@@ -11,6 +11,17 @@ dependencies = [
     "pydantic>=2.13.4",
     "pydantic-settings>=2.15.0",
     "python-dotenv>=1.2.3",
+    "rich>=15.0.0",
     "sqlalchemy>=2.0.52",
+    "typer>=0.27.1",
     "uvicorn[standard]>=0.52.3",
 ]
+
+[project.scripts]
+ai-agent = "backend.cli.main:app"
+
+[tool.uv]
+package = true
+
+[tool.setuptools.packages.find]
+include = ["backend*"]
