@@ -88,16 +88,40 @@
   `HF_TOKEN` must be attached manually via the notebook editor's
   Add-ons -> Secrets menu before it can run.
 
+## CodingAgent grounding fix — re-tested live, real result
+
+Re-tested against a live Colab-hosted Qwen2.5-Coder-7B-Instruct
+(q8_0 GGUF, real GPU inference verified via response latency ~1s).
+Task: "Read calculator.py and tell me if the divide function has a
+bug." The original bug — agent read the file (divide present in the
+tool result), then claimed "there is no divide function," directly
+contradicting its own tool result — is fixed. The agent this time
+correctly references the divide function it actually read; no
+hallucinated absence.
+
+Not a clean pass, though: the agent concluded "the divide function
+appears to be implemented correctly," which is questionable — `def
+divide(a, b): return a / b` has no zero-division guard, a real latent
+bug (the same pattern several coding-v1 bug_fix examples were built
+around). This isn't a grounding failure (nothing contradicts the tool
+result), but a separate code-review-thoroughness gap. It also made an
+unnecessary extra tool call (`search_code('divide function')` -> `[]`)
+after already having the answer, a minor violation of the "don't call
+tools just to be sure" system prompt rule.
+
 ## Not yet done
 
 - Push a Kaggle session slot free enough to actually run the training
   notebook (blocked on the session cap above) and attach the
-  `HF_TOKEN` Kaggle Secret (manual, one-time).
-- Re-test the `CodingAgent` grounding-prompt fix against a live
-  endpoint (blocked on the same Kaggle availability, or an alternate
-  live Colab session).
+  `HF_TOKEN` Kaggle Secret (manual, one-time) -- OR run the Colab
+  variant (cloud/colab/train-coding-v1/) instead, now that inference
+  has moved to Colab; same manual secret step applies there too.
 - Deliberate kill-mid-training-and-resume test, to prove the
   checkpoint resilience guarantee for real.
+- Address the code-review-thoroughness gap found above (agent didn't
+  flag a real latent bug it wasn't explicitly asked to find) -- not
+  blocking, but worth a future coding-v1 dataset addition targeting
+  proactive bug-spotting, not just grounding.
 - Base-model-vs-fine-tuned evaluation on real tasks, logged to the
   `Evaluation` table.
 - Terminal sandboxing / test-fix loop for the coding agent (original
