@@ -109,20 +109,60 @@ unnecessary extra tool call (`search_code('divide function')` -> `[]`)
 after already having the answer, a minor violation of the "don't call
 tools just to be sure" system prompt rule.
 
+## First training run — real, complete, with a real overfitting finding
+
+Ran for real on Colab (Qwen2.5-Coder-7B-Instruct, QLoRA, coding-v1).
+Hit and fixed two real bugs live: an eval-time OOM
+(`per_device_eval_batch_size` defaulted to 8, never set explicitly)
+and a training-time OOM during backward (fixed with
+`optim="paged_adamw_8bit"`, the standard QLoRA fix for this failure
+mode). In the process, checkpoint-resume was proven twice for real —
+after each crash, the next run correctly downloaded the right
+checkpoint from HF storage and resumed from that exact step, not from
+zero. One resume attempt hit a `KeyError` because a checkpoint saved
+under the old plain-AdamW optimizer was incompatible with the newly
+added paged optimizer's state format — an expected one-time
+consequence of changing optimizer type mid-experiment, not a flaw in
+the resume mechanism; fixed by deleting that one stale checkpoint from
+HF storage so the next run started clean with the new optimizer.
+
+Training then completed all 20/20 steps (5 epochs), all 5 checkpoints
+(steps 4/8/12/16/20) verified present and complete in HF storage.
+Real, extracted training history:
+
+| Epoch | Train loss | Eval loss |
+|---|---|---|
+| 1 | 0.591 | 0.756 |
+| 2 | 0.332 | 0.760 |
+| 3 | 0.249 | 0.802 |
+| 4 | 0.229 | 0.863 |
+| 5 | 0.174 | not captured -- Colab's free-tier GPU usage limit was hit right around this point, before the notebook's own final-eval cell (Cell 5) could run |
+
+Train loss dropping while eval loss climbs is real overfitting,
+unsurprising for 5 epochs over 32 examples -- an honest first result,
+not a strong model, matching the project's own framing that
+Experiment #1's goal is to prove the pipeline works.
+
 ## Not yet done
 
-- Push a Kaggle session slot free enough to actually run the training
-  notebook (blocked on the session cap above) and attach the
-  `HF_TOKEN` Kaggle Secret (manual, one-time) -- OR run the Colab
-  variant (cloud/colab/train-coding-v1/) instead, now that inference
-  has moved to Colab; same manual secret step applies there too.
-- Deliberate kill-mid-training-and-resume test, to prove the
-  checkpoint resilience guarantee for real.
-- Address the code-review-thoroughness gap found above (agent didn't
+- Run Cell 5 (final eval + adapter upload to a clean `adapters/...`
+  path) and Cell 6 (base-vs-finetuned eval_loss comparison via
+  `disable_adapter()`) -- blocked on Colab's free-tier GPU usage limit,
+  hit right at the end of the training run above. A real platform
+  quota, not something to route around; waits on the limit resetting
+  (or, if ever wanted, Colab's paid Pay-As-You-Go compute units -- a
+  real $0 deviation, would need explicit sign-off first). The trained
+  adapter already exists safely at `checkpoint-20` in HF storage even
+  without this step.
+- Deliberate kill-mid-training-and-resume test was effectively already
+  done for real (see above, driven by real crashes rather than a
+  planned kill) -- resume is proven; a genuinely deliberate version
+  could still be run later for good measure but isn't blocking.
+- Record the real results in the registry DB via
+  `scripts/record_evaluation.py`, once Cell 6's `results.json` exists.
+- Address the code-review-thoroughness gap found earlier (agent didn't
   flag a real latent bug it wasn't explicitly asked to find) -- not
   blocking, but worth a future coding-v1 dataset addition targeting
   proactive bug-spotting, not just grounding.
-- Base-model-vs-fine-tuned evaluation on real tasks, logged to the
-  `Evaluation` table.
 - Terminal sandboxing / test-fix loop for the coding agent (original
   Phase 6 scope, not started).
